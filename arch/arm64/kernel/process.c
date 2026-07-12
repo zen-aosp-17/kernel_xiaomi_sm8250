@@ -77,8 +77,12 @@ EXPORT_SYMBOL_GPL(pm_power_off);
 void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
 EXPORT_SYMBOL_GPL(arm_pm_restart);
 
+#ifdef CONFIG_CPU_IDLE_GOV_TEO
 static DEFINE_PER_CPU(struct hrtimer, wfi_timer);
 s64 teo_wfi_timeout_ns(void);
+#else
+static inline s64 teo_wfi_timeout_ns(void) { return 0; }
+#endif
 
 static void __cpu_do_idle(void)
 {
@@ -91,9 +95,11 @@ static void __cpu_do_idle(void)
 	 */
 	if (wfi_timeout_ns) {
 		/* Use TEO's estimated sleep duration with some slack added */
+#ifdef CONFIG_CPU_IDLE_GOV_TEO
 		timer = this_cpu_ptr(&wfi_timer);
 		hrtimer_start(timer, ns_to_ktime(wfi_timeout_ns),
 			      HRTIMER_MODE_REL_PINNED_HARD);
+#endif
 	}
 
 	dsb(sy);
@@ -104,6 +110,7 @@ static void __cpu_do_idle(void)
 		hrtimer_try_to_cancel(timer);
 }
 
+#ifdef CONFIG_CPU_IDLE_GOV_TEO
 static int __init wfi_timer_init(void)
 {
 	int cpu;
@@ -114,6 +121,7 @@ static int __init wfi_timer_init(void)
 	return 0;
 }
 pure_initcall(wfi_timer_init);
+#endif
 
 /*
  *	cpu_do_idle()
